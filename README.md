@@ -1,43 +1,85 @@
 # BI Supermarket Site Selection 🛒🗺️
 
 ## Overview
-This repository contains the geospatial analysis and location modeling project developed for the Data Analysis and Machine Learning course. The main objective is to evaluate and determine the optimal strategic locations for new supermarkets in two major Chilean urban areas: **Greater Santiago** and **Greater Concepción**.
 
-By applying Spatial ETL workflows, this project integrates demographic data and urban infrastructure layers to identify areas with high demand potential and optimal accessibility.
+This repository contains a geospatial analysis and location modeling project developed for the *Data Analysis and Machine Learning* course.
+
+The main objective is to identify optimal strategic locations for new supermarkets in two major Chilean metropolitan areas:
+
+- **Greater Santiago**
+- **Greater Concepción**
+
+By applying Spatial ETL workflows, the project integrates demographic information and urban infrastructure data to identify areas with high demand potential and optimal accessibility.
+
+---
 
 ## Key Features & Methodology
-- **Spatial Data Extraction:** Reading and filtering large geospatial datasets (including OpenStreetMap networks and 2024 Census block-level data).
-- **Data Cleaning & Transformation:** Processing geometries, handling missing values, and generating relevant spatial features (e.g., transport accessibility, demographic density).
-- **CSV Export for ML:** Structuring and exporting the processed spatial data into ready-to-use tabular formats (`.csv`) for future predictive modeling and site selection algorithms.
+
+- **Spatial Data Extraction:** Reading and filtering large geospatial datasets, including OpenStreetMap road networks and 2024 Census block-level data.
+- **Data Cleaning & Transformation:** Processing geometries, handling missing values, and generating relevant spatial features such as transport accessibility and demographic density.
+- **CSV Export for Machine Learning:** Structuring and exporting processed spatial data into ready-to-use `.csv` datasets for future predictive modeling and site selection algorithms.
+
+---
 
 ## Tech Stack 🛠️
+
 - **Language:** Python
 - **Environment:** Jupyter Notebooks
 - **Geospatial Libraries:** `geopandas`, `osmnx`, `shapely`
 - **Data Manipulation:** `pandas`, `numpy`
 
-## Repository Structure
+---
+
+## Data Download & Setup 📥
+
+Due to their size, the geospatial and demographic datasets are not included in this repository.
+
+To reproduce the analysis locally:
+
+1. Create the following directory:
+
 ```text
-├── data/
-│   ├── raw/                             # (Ignored in .gitignore) Large input geospatial files
-│   └── processed/                       # (Ignored in .gitignore) Output .csv files for ML
-├── 01_spatial_data_processing.ipynb       # Extracts raw data, performs ETL, and exports to CSV
-├── .gitignore
-├── requirements.txt
-└── README.md
+data/raw/
+```
 
-Data Download & Setup 📥
-Geospatial and demographic datasets are too large to be hosted on GitHub. To replicate this environment and run the analysis locally, you must manually create a data/raw/ directory in the root of the project and download the following files into it:
+2. Download the required datasets:
 
-2024 Census Data: Download the demographic data from the official INE results page: Censo 2024 Resultados
+   - **2024 Census Data:** Available from the official INE website:
+     https://censo2024.ine.gob.cl/
 
-OpenStreetMap Data: Download the spatial data and street networks for Chile from Geofabrik: Geofabrik - Chile
+   - **OpenStreetMap Data (Chile):** Available from Geofabrik:
+     https://download.geofabrik.de/south-america/chile.html
 
-Once the raw data is in place, you can install the dependencies and execute the notebook:
+3. Install the required dependencies:
 
+```bash
 pip install -r requirements.txt
+```
 
-Team / Authors
-[Mateo JR]
+4. Run the notebook:
 
-[Elizabeth Echeverría]
+```text
+01_spatial_data_processing.ipynb
+```
+
+---
+
+## Repository Structure
+
+```text
+.
+├── data/
+│   ├── raw/                     # Ignored in .gitignore (input datasets)
+│   └── processed/               # Ignored in .gitignore (generated CSV datasets)
+├── 01_spatial_data_processing.ipynb
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+---
+
+## Authors
+
+- Mateo JR
+- Elizabeth Echeverría
