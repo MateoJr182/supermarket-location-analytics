@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+
+# Datos espaciales y archivos pesados del proyecto
+*.parquet
+*.geojson
+*.gpkg
+data/
