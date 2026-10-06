@@ -45,7 +45,7 @@ data/raw/
 2. Download the required datasets:
 
    - **2024 Census Data:** Available from the official INE website:
-     https://censo2024.ine.gob.cl/
+     https://censo2024.ine.gob.cl/resultados/
 
    - **OpenStreetMap Data (Chile):** Available from Geofabrik:
      https://download.geofabrik.de/south-america/chile.html
