@@ -18,11 +18,26 @@ By applying Spatial ETL workflows, this project integrates demographic data and 
 
 ## Repository Structure
 ```text
-├── notebooks/
-│   └── 01_spatial_data_processing.ipynb       # Extracts raw data, performs ETL, and exports to CSV
 ├── data/
 │   ├── raw/                             # (Ignored in .gitignore) Large input geospatial files
 │   └── processed/                       # (Ignored in .gitignore) Output .csv files for ML
+├── 01_spatial_data_processing.ipynb       # Extracts raw data, performs ETL, and exports to CSV
 ├── .gitignore
 ├── requirements.txt
 └── README.md
+
+Data Download & Setup 📥
+Geospatial and demographic datasets are too large to be hosted on GitHub. To replicate this environment and run the analysis locally, you must manually create a data/raw/ directory in the root of the project and download the following files into it:
+
+2024 Census Data: Download the demographic data from the official INE results page: Censo 2024 Resultados
+
+OpenStreetMap Data: Download the spatial data and street networks for Chile from Geofabrik: Geofabrik - Chile
+
+Once the raw data is in place, you can install the dependencies and execute the notebook:
+
+pip install -r requirements.txt
+
+Team / Authors
+[Mateo JR]
+
+[Elizabeth Echeverría]
