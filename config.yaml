@@ -1,0 +1,45 @@
+# Configuración del ETL v2. Todo lo que cambia entre corridas vive aquí, no en el código.
+
+version: "2.0"
+
+rutas:
+  gpkg_osm: data/raw/chile.gpkg
+  censo_manzanas: data/raw/Cartografia_censo2024_Pais_Manzanas.parquet
+  censo_comunas: data/raw/Cartografia_censo2024_Pais_Comunal.parquet
+  interim: data/interim          # capas intermedias por ciudad (no se versionan)
+  processed: data/processed      # tablas por celda en Parquet (sí se versionan)
+  resultados: resultados/etl_v2  # resumen y figuras de control
+
+# Fecha del extracto de OpenStreetMap. Tomada de la fecha de modificación de chile.gpkg:
+osm_fecha_descarga: "2026-10-02"
+
+grilla:
+  tamanos_m: [125, 250, 500, 1000]   # 250 m es el tamaño principal; el resto es sensibilidad
+  tamano_principal_m: 250
+  desfase_sensibilidad_m: 125        # grilla extra de 250 m desplazada 125 m (0 = no se corre)
+
+osm:
+  clases_viales: [primary, secondary, tertiary, trunk]
+  clases_via_principal: [primary, trunk]
+  clases_transporte: [bus_stop, bus_station, station]
+  categorias_poi: [supermarket, convenience, mall, pharmacy, marketplace,
+                   school, university, college, hospital, clinic, sports_centre]
+
+ciudades:
+  stgo:
+    nombre: Gran Santiago
+    crs_utm: "EPSG:32719"
+    comunas: [SANTIAGO, CERRILLOS, CERRO NAVIA, CONCHALI, EL BOSQUE, ESTACION CENTRAL,
+              HUECHURABA, INDEPENDENCIA, LA CISTERNA, LA FLORIDA, LA GRANJA, LA PINTANA,
+              LA REINA, LAS CONDES, LO BARNECHEA, LO ESPEJO, LO PRADO, MACUL, MAIPU, NUNOA,
+              PEDRO AGUIRRE CERDA, PENALOLEN, PROVIDENCIA, PUDAHUEL, QUILICURA,
+              QUINTA NORMAL, RECOLETA, RENCA, SAN JOAQUIN, SAN MIGUEL, SAN RAMON, VITACURA,
+              PUENTE ALTO, SAN BERNARDO, PADRE HURTADO, LAMPA, SAN JOSE DE MAIPO, COLINA,
+              PIRQUE]
+  ccp:
+    nombre: Gran Concepción
+    crs_utm: "EPSG:32718"
+    # v2: se agregan Coronel, Lota y Tomé (el Área Metropolitana oficial tiene 11 comunas;
+    # Hualqui y Santa Juana quedan fuera por ser mayormente rurales).
+    comunas: [CONCEPCION, TALCAHUANO, HUALPEN, SAN PEDRO DE LA PAZ, CHIGUAYANTE, PENCO,
+              CORONEL, LOTA, TOME]

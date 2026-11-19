@@ -225,4 +225,7 @@ __marimo__/
 *.parquet
 *.geojson
 *.gpkg
-data/
+data/*
+# Las tablas procesadas sí se versionan (instrucciones: control de versión de códigos y bases de datos)
+!data/processed/
+!data/processed/*.parquet
