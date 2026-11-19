@@ -10,7 +10,7 @@ rutas:
   processed: data/processed      # tablas por celda en Parquet (sí se versionan)
   resultados: resultados/etl_v2  # resumen y figuras de control
 
-# Fecha del extracto de OpenStreetMap. Tomada de la fecha de modificación de chile.gpkg:
+# Fecha del extracto de OpenStreetMap (descarga de chile.gpkg desde Geofabrik).
 osm_fecha_descarga: "2026-10-02"
 
 grilla:

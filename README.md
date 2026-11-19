@@ -2,7 +2,7 @@
 
 Proyecto del curso *Data Analysis and Machine Learning* (Trabajo BI-ML 2026, Ingeniería Industrial, Universidad de Concepción). Usa solo datos abiertos, Censo 2024 y OpenStreetMap, para encontrar zonas del Gran Santiago y del Gran Concepción que hoy tienen menos supermercados de los que su demanda y accesibilidad harían esperar.
 
-> **Estado:** v2.0 en desarrollo. El ETL v2 está listo; el filtro de celdas inhabitables, las variables de entorno, el modelo y el dashboard vienen en las próximas iteraciones (ver [Historial de versiones](#historial-de-versiones)).
+> **Estado:** v2.0 en desarrollo. El ETL v2 está listo y corrido con los datos reales; el filtro de celdas inhabitables, las variables de entorno, el modelo y el dashboard vienen en las próximas iteraciones (ver [Historial de versiones](#historial-de-versiones)). La versión presentada en el avance queda en el tag [`v1.0`](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0).
 
 ## Contenido
 
@@ -40,7 +40,7 @@ Abrir un supermercado es una inversión alta y difícil de revertir. Hoy la bús
 
 | Fuente | Archivo en `data/raw/` | Qué se usa | Fecha |
 | --- | --- | --- | --- |
-| [OpenStreetMap Chile (Geofabrik)](https://download.geofabrik.de/south-america/chile.html) | `chile.gpkg` | Vías, paraderos, uso de suelo residencial y 11 categorías de puntos de interés (puntos y polígonos) | Extracto del 2026-10-02 (por confirmar) |
+| [OpenStreetMap Chile (Geofabrik)](https://download.geofabrik.de/south-america/chile.html) | `chile.gpkg` | Vías, paraderos, uso de suelo residencial y 11 categorías de puntos de interés (puntos y polígonos) | Extracto del 2026-10-02 |
 | [Censo 2024, manzanas (INE)](https://censo2024.ine.gob.cl/resultados/) | `Cartografia_censo2024_Pais_Manzanas.parquet` | Personas por manzana (`n_per`) | Censo 2024 |
 | [Censo 2024, comunas (INE)](https://censo2024.ine.gob.cl/resultados/) | `Cartografia_censo2024_Pais_Comunal.parquet` | Límites comunales para armar cada ciudad | Censo 2024 |
 
@@ -48,6 +48,18 @@ Abrir un supermercado es una inversión alta y difícil de revertir. Hoy la bús
 
 - **Gran Santiago:** 39 comunas.
 - **Gran Concepción:** 9 comunas: Concepción, Talcahuano, Hualpén, San Pedro de la Paz, Chiguayante, Penco, Coronel, Lota y Tomé. El Área Metropolitana oficial tiene 11; Hualqui y Santa Juana quedan fuera por ser mayormente rurales.
+
+**Resumen por ciudad** (ETL v2, celdas de 250 m)
+
+| | Gran Santiago | Gran Concepción |
+| --- | ---: | ---: |
+| Comunas | 39 | 9 |
+| Habitantes (Censo 2024) | 6.532.737 | 954.408 |
+| Supermercados (OSM) | 524 | 159 |
+| Paraderos y estaciones | 12.416 | 2.460 |
+| Puntos de interés (11 categorías, incluye supermercados) | 8.396 | 1.497 |
+| Celdas | 148.932 | 25.233 |
+| Celdas pobladas | 9.585 | 2.317 |
 
 **Unidad de análisis:** celda cuadrada de 250 × 250 m (tamaño principal), con versiones de 125, 500 y 1000 m y una grilla de 250 m desplazada 125 m para el análisis de sensibilidad.
 
@@ -100,19 +112,56 @@ Cada decisión responde a un punto del feedback de la presentación de avance o 
 | Celdas completas alineadas a múltiplos del tamaño, sin recorte | En la v1, `gpd.clip` dejaba celdas de borde más chicas con conteos no comparables | v2.0 |
 | Puntos asignados a la celda por índice, no con `sjoin` | Más rápido, sin dobles conteos en los bordes y permite recorrer varios tamaños | v2.0 |
 | Sensibilidad con 125, 250, 500 y 1000 m y grilla desplazada | El resultado depende del tamaño y la posición de la celda (feedback; problema MAUP) | v2.0 |
-| 250 m como tamaño principal; 125 m solo como extremo fino | A 125 m casi todas las celdas tienen 0 o 1 supermercado y la población por manzana queda dispersa | v2.0 |
+| 250 m como tamaño principal; 125 m solo como extremo fino | A 125 m la mitad de las celdas con supermercado queda sin habitantes y a 1000 m se pierde la ubicación del terreno (ver [Resultados](#5-resultados)) | v2.0 |
 | Vías y uso de suelo residencial como variables | En la v1 se extraían pero no se usaban | v2.0 |
 | Salida en Parquet con coordenadas | Sin coordenadas no se pueden calcular variables de entorno ni validar por bloques | v2.0 |
 | Gran Concepción con 9 comunas | Más casos de Concepción para entrenar; el área metropolitana oficial tiene 11 | v2.0 |
 | Parámetros en `config.yaml` | Re-ejecutar con un nuevo extracto de OSM sin tocar el código | v2.0 |
-| Filtro de celdas a ≤ X m de una celda poblada, con X elegido desde los datos | El 14% de las celdas con supermercado (v1) no tiene habitantes; filtrar solo celdas pobladas los borraría (feedback) | v2.0, pendiente |
+| ETL v1 archivado en `archivo/` y marcado con el tag `v1.0` | Dejar visible la evolución sin confundir el notebook vigente | v2.0 |
+| Filtro de celdas a ≤ X m de una celda poblada, con X elegido desde los datos | A 250 m, el 15% de las celdas con supermercado no tiene habitantes; filtrar solo celdas pobladas las borraría (feedback) | v2.0, pendiente |
 | Variables del entorno (500 m y 1 km) y validación por bloques espaciales | La correlación espacial debe medirse, incluirse en las variables y considerarse al validar (feedback) | v2.0, pendiente |
 | Un solo modelo con ambas ciudades | Entrenar en una ciudad y aplicar en otra no sirve porque el ajuste es distinto (feedback) | v2.0, pendiente |
 
 ## 5. Resultados
 
-*Se completa al correr el ETL v2 con los datos reales:* tabla de `resultados/etl_v2/resumen_tamanos.csv` (celdas, celdas con supermercado y con dos o más, por ciudad y tamaño) y mapa de control `resultados/etl_v2/mapa_control_250m.png`.
-![alt text](image.png)
+### 5.1 Sensibilidad al tamaño de celda (ETL v2)
+
+Cada fila es una grilla distinta sobre los mismos datos: 524 supermercados en Gran Santiago y 159 en Gran Concepción. Fuente: [`resultados/etl_v2/resumen_tamanos.csv`](resultados/etl_v2/resumen_tamanos.csv).
+
+| Ciudad | Celda | Celdas | Celdas pobladas | Celdas con supermercado | Con 2 o más | % con 2 o más | % sin habitantes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Gran Santiago | 125 m | 592.306 | 24.289 | 510 | 12 | 2,4% | 50,4% |
+| Gran Santiago | **250 m** | 148.932 | 9.585 | 490 | 28 | 5,7% | 15,1% |
+| Gran Santiago | 250 m desplazada 125 m | 148.927 | 9.642 | 489 | 33 | 6,7% | 13,5% |
+| Gran Santiago | 500 m | 37.661 | 3.232 | 438 | 67 | 15,3% | 3,4% |
+| Gran Santiago | 1000 m | 9.623 | 1.065 | 330 | 121 | 36,7% | 1,2% |
+| Gran Concepción | 125 m | 98.542 | 5.370 | 152 | 6 | 3,9% | 44,1% |
+| Gran Concepción | **250 m** | 25.233 | 2.317 | 138 | 17 | 12,3% | 15,2% |
+| Gran Concepción | 250 m desplazada 125 m | 25.211 | 2.311 | 141 | 15 | 10,6% | 12,1% |
+| Gran Concepción | 500 m | 6.580 | 883 | 112 | 33 | 29,5% | 3,6% |
+| Gran Concepción | 1000 m | 1.783 | 338 | 80 | 40 | 50,0% | 0,0% |
+
+Los porcentajes se calculan sobre las celdas con supermercado.
+
+- **250 m se mantiene como tamaño principal.** A 125 m, la mitad de las celdas con supermercado no tiene habitantes (50,4% en Santiago y 44,1% en Concepción), porque la población se asigna por manzana y la celda queda más chica que el entorno de una manzana. A 1000 m, el 37% de las celdas con supermercado en Santiago y el 50% en Concepción tienen dos o más: la celda es demasiado gruesa para ubicar un terreno.
+- **El conteo agrega información.** A 250 m, el 5,7% de las celdas con supermercado en Santiago y el 12,3% en Concepción tienen dos o más, algo que la variable binaria de la v1 no registraba.
+- **La posición de la grilla casi no cambia el resultado.** Desplazar la grilla de 250 m en 125 m mueve las celdas con supermercado de 490 a 489 en Santiago y de 138 a 141 en Concepción.
+- **El filtro de celdas inhabitables necesita una distancia X.** A 250 m, el 15% de las celdas con supermercado no tiene habitantes; un filtro de "solo celdas pobladas" las borraría.
+
+### 5.2 Comparación con la v1 (celdas de 250 m)
+
+| | Gran Santiago v1 | Gran Santiago v2 | Gran Concepción v1 | Gran Concepción v2 |
+| --- | ---: | ---: | ---: | ---: |
+| Comunas | 39 | 39 | 6 | 9 |
+| Celdas | 148.911 | 148.932 | 10.501 | 25.233 |
+| Celdas con supermercado | 486 | 490 | 120 | 138 |
+| Habitantes | 6.532.737 | 6.532.737 | 742.804 | 954.408 |
+
+En Santiago las diferencias son menores y vienen de usar celdas completas y asignar los puntos por índice. En Concepción el cambio viene de sumar Coronel, Lota y Tomé.
+
+### 5.3 Mapa de control
+
+![Mapa de control a 250 m: población por celda y celdas con supermercado en Gran Santiago y Gran Concepción](resultados/etl_v2/mapa_control_250m.png)
 
 ## 6. Riesgos de datos y limitaciones
 
@@ -138,9 +187,9 @@ Cada decisión responde a un punto del feedback de la presentación de avance o 
    python -m src.etl
    ```
 
-   Genera `data/processed/celdas_*.parquet`, `data/interim/*_capas.gpkg` y `resultados/etl_v2/`. Si un supermercado, paradero o habitante queda sin celda, la corrida se detiene.
+   Genera `data/processed/celdas_*.parquet`, `data/interim/*_capas.gpkg` y `resultados/etl_v2/`, y toma unos 15 minutos. Si un supermercado, paradero o habitante queda sin celda, la corrida se detiene.
 
-Las tablas de `data/processed/` sí se versionan, así que los notebooks de análisis se pueden correr sin descargar los datos crudos.
+Las tablas de `data/processed/` sí se versionan, así que los notebooks de análisis se pueden correr sin descargar los datos crudos. La versión de la presentación de avance se puede revisar en el tag [`v1.0`](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0) o con `git checkout v1.0`.
 
 ## 8. Estructura del repositorio
 
@@ -150,12 +199,15 @@ Las tablas de `data/processed/` sí se versionan, así que los notebooks de aná
 ├── src/
 │   └── etl.py                         # funciones del ETL v2
 ├── 01_etl_v2.ipynb                    # corre el ETL v2 y muestra los controles
-├── 01_spatial_data_processing.ipynb   # ETL v1 (histórico, presentación de avance)
+├── archivo/                           # v1 de la presentación de avance (tag v1.0)
+│   ├── 01_etl_v1.ipynb
+│   └── dataset_entrenamiento_<ciudad>.csv
 ├── data/
 │   ├── raw/                           # datos crudos (no se versionan)
 │   ├── interim/                       # capas intermedias por ciudad (no se versionan)
 │   └── processed/                     # tablas por celda (se versionan)
-├── resultados/                        # tablas y figuras generadas
+├── resultados/
+│   └── etl_v2/                        # resumen de tamaños y mapa de control
 ├── requirements.txt
 └── README.md
 ```
@@ -181,6 +233,8 @@ Responde al feedback de la presentación de avance. Rama `ETL-V2`.
 - Controles de calidad: la corrida se detiene si algún supermercado, paradero o habitante queda sin celda.
 - Capas intermedias guardadas en `data/interim/` en vez de la raíz del repositorio.
 - `requirements.txt` agregado y README reestructurado con decisiones e historial.
+- Corrida con los datos reales y análisis de sensibilidad al tamaño de celda (ver [Resultados](#5-resultados)).
+- ETL v1 archivado en `archivo/`; la versión de la presentación de avance queda en el tag `v1.0`.
 
 **Pendiente en esta versión**
 
@@ -189,7 +243,7 @@ Responde al feedback de la presentación de avance. Rama `ETL-V2`.
 - Modelo de conteo con ambas ciudades y validación por bloques espaciales.
 - Brecha por zona y dashboard para la demo.
 
-### v1.0 — base de la presentación de avance (2026-10-07)
+### [v1.0](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0) — base de la presentación de avance (2026-10-07)
 
 - Gran Santiago ampliado a 39 comunas según la definición del INE (PR #1).
 - Base para la presentación de avance: descriptivo por ciudad y correlaciones.
@@ -205,7 +259,7 @@ Responde al feedback de la presentación de avance. Rama `ETL-V2`.
 
 ### v0.1 — primer ETL (2026-10-06)
 
-- Notebook `01_spatial_data_processing.ipynb`: máscaras comunales, capas OSM (puntos de interés como puntos y polígonos sin duplicados), grilla de 250 m recortada a cada ciudad, variable binaria de supermercado, conteos por categoría y población del Censo 2024 por centroide de manzana.
+- Notebook `01_spatial_data_processing.ipynb` (hoy `archivo/01_etl_v1.ipynb`): máscaras comunales, capas OSM (puntos de interés como puntos y polígonos sin duplicados), grilla de 250 m recortada a cada ciudad, variable binaria de supermercado, conteos por categoría y población del Censo 2024 por centroide de manzana.
 - CSV de entrenamiento por ciudad en `data/processed/`.
 
 ---

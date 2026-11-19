@@ -1,6 +1,6 @@
 """ETL v2: grilla espacial y variables por celda para Gran Santiago y Gran Concepción.
 
-Cambios respecto de la v1 (notebook 01_spatial_data_processing.ipynb):
+Cambios respecto de la v1 (archivo/01_etl_v1.ipynb, tag v1.0):
 - Celdas completas alineadas a múltiplos del tamaño (sin gpd.clip): 125, 250, 500 y 1000 m
   quedan anidadas y las celdas del borde ya no son más chicas.
 - Puntos asignados a su celda por índice, no con sjoin: más rápido y sin dobles conteos.
