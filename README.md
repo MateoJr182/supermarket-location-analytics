@@ -216,7 +216,7 @@ Las tablas de `data/processed/` sí se versionan, así que los notebooks de aná
 
 ## Historial de versiones
 
-### v2.0 — en desarrollo (desde 2026-11-18)
+### v2.0 — en desarrollo (desde 2026-10-18)
 
 Responde al feedback de la presentación de avance. Rama `ETL-V2`.
 
