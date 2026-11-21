@@ -1,0 +1,25 @@
+ciudad,familia,escala,variable,spearman
+ccp,Población,En la celda,poblacion_celda,0.144
+ccp,Población,En 500 m,pob_500m,0.165
+ccp,Población,En 1 km,pob_1000m,0.168
+ccp,Paraderos,En la celda,conteo_paraderos,0.212
+ccp,Paraderos,En 500 m,paraderos_500m,0.195
+ccp,Paraderos,En 1 km,paraderos_1000m,0.181
+ccp,Comercio,En la celda,comercio_celda,0.333
+ccp,Comercio,En 500 m,comercio_500m,0.221
+ccp,Comercio,En 1 km,comercio_1000m,0.18
+ccp,Vías,En la celda,largo_vias_m,0.206
+ccp,Vías,En 500 m,vias_km_500m,0.207
+ccp,Vías,En 1 km,vias_km_1000m,0.187
+stgo,Población,En la celda,poblacion_celda,0.118
+stgo,Población,En 500 m,pob_500m,0.147
+stgo,Población,En 1 km,pob_1000m,0.152
+stgo,Paraderos,En la celda,conteo_paraderos,0.162
+stgo,Paraderos,En 500 m,paraderos_500m,0.156
+stgo,Paraderos,En 1 km,paraderos_1000m,0.142
+stgo,Comercio,En la celda,comercio_celda,0.277
+stgo,Comercio,En 500 m,comercio_500m,0.192
+stgo,Comercio,En 1 km,comercio_1000m,0.164
+stgo,Vías,En la celda,largo_vias_m,0.174
+stgo,Vías,En 500 m,vias_km_500m,0.175
+stgo,Vías,En 1 km,vias_km_1000m,0.16
