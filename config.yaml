@@ -1,4 +1,4 @@
-# Configuración del ETL v2. Todo lo que cambia entre corridas vive aquí, no en el código.
+# Configuración del proyecto (ETL v2 y variables de entorno). Todo lo que cambia entre corridas vive aquí, no en el código.
 
 version: "2.0"
 
@@ -9,6 +9,7 @@ rutas:
   interim: data/interim          # capas intermedias por ciudad (no se versionan)
   processed: data/processed      # tablas por celda en Parquet (sí se versionan)
   resultados: resultados/etl_v2  # resumen y figuras de control
+  resultados_features: resultados/features  # filtro X y variables de entorno
 
 # Fecha del extracto de OpenStreetMap (descarga de chile.gpkg desde Geofabrik).
 osm_fecha_descarga: "2026-10-02"
@@ -24,6 +25,18 @@ osm:
   clases_transporte: [bus_stop, bus_station, station]
   categorias_poi: [supermarket, convenience, mall, pharmacy, marketplace,
                    school, university, college, hospital, clinic, sports_centre]
+
+features:
+  radios_m: [500, 1000]              # radios de las variables de entorno (área de captación caminando)
+  grupos_poi:                        # categorías OSM que se suman en el entorno
+    comercio: [convenience, mall, pharmacy, marketplace]
+    educacion: [school, university, college]
+    salud: [hospital, clinic]
+    deporte: [sports_centre]
+  filtro_x:
+    candidatos_m: [0, 250, 500, 750, 1000, 1500, 2000]
+    cobertura_supermercados: 0.99    # X = menor candidato que conserva al menos el 99% de los supermercados
+    x_fijo_m: null                   # si se define un número, se usa en vez del X elegido por datos
 
 ciudades:
   stgo:
