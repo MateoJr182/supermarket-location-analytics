@@ -2,7 +2,7 @@
 
 Proyecto del curso *Data Analysis and Machine Learning* (Trabajo BI-ML 2026, Ingeniería Industrial, Universidad de Concepción). Usa solo datos abiertos, Censo 2024 y OpenStreetMap, para encontrar zonas del Gran Santiago y del Gran Concepción que hoy tienen menos supermercados de los que su demanda y accesibilidad harían esperar.
 
-> **Estado:** v2.0 en desarrollo. El ETL v2, el filtro de celdas inhabitables y las variables de entorno están listos y corridos con los datos reales; el diagnóstico espacial, el modelo y el dashboard vienen en las próximas iteraciones (ver [Historial de versiones](#historial-de-versiones)). La versión presentada en el avance queda en el tag [`v1.0`](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0).
+> **Estado:** v2.0 en desarrollo. El ETL v2, el filtro de celdas inhabitables, las variables de entorno y el diagnóstico espacial están listos y corridos con los datos reales; el modelo y el dashboard vienen en las próximas iteraciones (ver [Historial de versiones](#historial-de-versiones)). La versión presentada en el avance queda en el tag [`v1.0`](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0).
 
 ## Contenido
 
@@ -109,7 +109,7 @@ flowchart TD
 | --- | --- | --- |
 | ETL (grilla, conteos, censo, vías) | Listo (v2) | `src/etl.py`, `01_etl_v2.ipynb` |
 | Filtro de habitabilidad y variables de entorno | Listo (v2) | `src/features.py`, `03_filtro_y_entorno.ipynb` |
-| Diagnóstico espacial (Moran, LISA) | En desarrollo | `02_diagnostico_espacial.ipynb` |
+| Diagnóstico espacial (Moran, correlograma, LISA) | Listo (v2) | `02_diagnostico_espacial.ipynb` |
 | Modelo y brecha | Pendiente | |
 | Dashboard | Pendiente | |
 
@@ -134,7 +134,9 @@ Cada decisión responde a un punto del feedback de la presentación de avance o 
 | El mismo X para todos los tamaños de celda | Que el análisis de sensibilidad compare grillas sobre el mismo territorio | v2.0 |
 | Variables del entorno en radios de 500 m y 1 km | La demanda de un supermercado está en el área que lo rodea; es la forma de incluir la correlación espacial en las variables (feedback) | v2.0 |
 | Supermercados vecinos fuera de los predictores | Son la variable objetivo desplazada en el espacio: el modelo recomendaría abrir al lado de los existentes. Se usan solo en la capa de decisión | v2.0 |
-| Medir la correlación espacial (Moran, LISA) y validar por bloques espaciales | La correlación espacial debe medirse y considerarse al validar (feedback) | v2.0, pendiente |
+| Medir la correlación espacial (Moran, correlograma, LISA) | La correlación espacial debe medirse antes de modelar (feedback) | v2.0 |
+| Validar con bloques espaciales de 3 km (2 y 5 km como sensibilidad) | En el correlograma, el parecido entre celdas se apaga entre 2 y 3 km; con bloques más chicos el modelo se evaluaría con celdas vecinas a las de entrenamiento (ver [5.6](#56-diagnóstico-espacial)) | v2.0, se aplica en el modelo |
+| P de LISA recalculado contando los empates | Con casi todas las celdas en 0, `esda` marca como significativos empates exactos y el 66% de las celdas de Santiago salía "bajo-bajo" | v2.0 |
 | Un solo modelo con ambas ciudades | Entrenar en una ciudad y aplicar en otra no sirve porque el ajuste es distinto (feedback) | v2.0, pendiente |
 
 ## 5. Resultados
@@ -209,6 +211,31 @@ Correlación de Spearman entre `n_supermercados` y cada variable, medida en la c
 - **El modelo usa ambas escalas.** La tabla para el modelo tiene 33 variables predictoras: 15 de la celda y 18 del entorno.
 - **Sobredispersión leve.** La varianza de `n_supermercados` es 1,1 veces su promedio en Santiago y 1,3 veces en Concepción: la regresión de Poisson sirve como modelo base y la Binomial Negativa queda como contraste.
 
+### 5.6 Diagnóstico espacial
+
+I de Moran global, correlograma y LISA de `n_supermercados` y `poblacion_celda` en la grilla de 250 m, con pesos binarios por distancia estandarizados por fila y 999 permutaciones. El universo principal son las celdas habitables (filtro X = 750 m); el notebook repite todo en las "celdas activas" (con población o algún punto de interés). Fuente: [`resultados/diagnostico_espacial/`](resultados/diagnostico_espacial/), notebook `02_diagnostico_espacial.ipynb`.
+
+| Celdas habitables de 250 m | Gran Santiago | Gran Concepción |
+| --- | ---: | ---: |
+| I de Moran, supermercados (8 vecinas, 360 m) | 0,064 | 0,101 |
+| I de Moran, población (8 vecinas, 360 m) | 0,492 | 0,395 |
+| I de Moran, supermercados, anillo de 2 a 3 km | 0,023 | 0,004 |
+| Celdas alto-alto del LISA (supermercados que contienen) | 78 (86) | 40 (48) |
+| Spearman supermercados vs. población de la celda | 0,12 | 0,14 |
+| Spearman supermercados vs. población a 1 km (sin la celda) | 0,15 | 0,17 |
+| Bloques de 3 km (con supermercado) | 230 (98) | 106 (33) |
+
+Todos los I de Moran de la tabla tienen p ≤ 0,05.
+
+![Correlograma espacial de supermercados y población: I de Moran acumulado y por anillos hasta 5 km](resultados/diagnostico_espacial/correlograma.png)
+
+- **Hay correlación espacial, débil en los supermercados y fuerte en la población.** El I de los supermercados es bajo en parte porque el 97,5% de las celdas tiene 0.
+- **El parecido entre celdas se apaga entre 2 y 3 km**, por eso la validación usará bloques de 3 km, con 2 y 5 km como sensibilidad. En Santiago la población sigue correlacionada a 5 km (I = 0,17) por el gradiente centro-periferia de toda la ciudad.
+- **Los supermercados forman polos comerciales:** 78 celdas alto-alto en Santiago y 40 en Concepción. Con 999 permutaciones ninguna pasa un control de falsos descubrimientos, así que se leen como zonas candidatas y no como prueba celda por celda.
+- **La población del entorno explica más que la de la celda**, lo que respalda las variables de entorno de [5.5](#55-variables-de-entorno). En la etapa del modelo se repetirá el I de Moran sobre los residuos.
+
+![LISA de supermercados en celdas habitables de 250 m: celdas alto-alto en Gran Santiago y Gran Concepción](resultados/diagnostico_espacial/lisa_supermercados_250m.png)
+
 ## 6. Riesgos de datos y limitaciones
 
 - **Cobertura desigual de OSM:** las comunas de mayores ingresos suelen estar mejor mapeadas, lo que sesga los conteos.
@@ -244,6 +271,8 @@ Correlación de Spearman entre `n_supermercados` y cada variable, medida en la c
 
    Lee las tablas de `data/processed/celdas_*.parquet`, genera `data/processed/modelo_*.parquet` y `resultados/features/`, y toma menos de un minuto. No necesita los datos crudos.
 
+5. Correr el diagnóstico espacial con el notebook `02_diagnostico_espacial.ipynb`. Lee `data/processed/`, genera `resultados/diagnostico_espacial/` y toma unos 3 minutos.
+
 Las tablas de `data/processed/` sí se versionan, así que los notebooks de análisis se pueden correr sin descargar los datos crudos. La versión de la presentación de avance se puede revisar en el tag [`v1.0`](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0) o con `git checkout v1.0`.
 
 ## 8. Estructura del repositorio
@@ -255,6 +284,7 @@ Las tablas de `data/processed/` sí se versionan, así que los notebooks de aná
 │   ├── etl.py                         # funciones del ETL v2
 │   └── features.py                    # filtro de celdas inhabitables y variables de entorno
 ├── 01_etl_v2.ipynb                    # corre el ETL v2 y muestra los controles
+├── 02_diagnostico_espacial.ipynb      # Moran global, correlograma, LISA y población de la celda vs. entorno
 ├── 03_filtro_y_entorno.ipynb          # elige X, aplica el filtro y revisa las variables de entorno
 ├── archivo/                           # v1 de la presentación de avance (tag v1.0)
 │   ├── 01_etl_v1.ipynb
@@ -265,7 +295,8 @@ Las tablas de `data/processed/` sí se versionan, así que los notebooks de aná
 │   └── processed/                     # tablas por celda y tablas para el modelo (se versionan)
 ├── resultados/
 │   ├── etl_v2/                        # resumen de tamaños y mapa de control
-│   └── features/                      # curva y mapa del filtro X, correlaciones de entorno
+│   ├── features/                      # curva y mapa del filtro X, correlaciones de entorno
+│   └── diagnostico_espacial/          # Moran, correlograma, LISA, Spearman y bloques de validación
 ├── requirements.txt
 └── README.md
 ```
@@ -276,7 +307,7 @@ Las tablas de `data/processed/` sí se versionan, así que los notebooks de aná
 
 ### v2.0 — en desarrollo (desde 2026-10-18)
 
-Responde al feedback de la presentación de avance. Ramas `ETL-V2` y `variables-entorno`.
+Responde al feedback de la presentación de avance. Ramas `ETL-V2`, `variables-entorno` y `diagnostico-espacial`.
 
 **Listo**
 
@@ -296,11 +327,11 @@ Responde al feedback de la presentación de avance. Ramas `ETL-V2` y `variables-
 - Filtro de celdas inhabitables (`src/features.py`): X = 750 m elegido con los datos; conserva el 99,4% de los supermercados y deja el 14,3% de la grilla.
 - Variables de entorno en radios de 500 m y 1 km y variables de competencia separadas para la capa de decisión.
 - Tablas para el modelo con ambas ciudades: `data/processed/modelo_<tamaño>m.parquet` (24.948 celdas habitables a 250 m).
+- Diagnóstico espacial (`02_diagnostico_espacial.ipynb`): I de Moran global, correlograma acumulado y por anillos hasta 5 km, LISA con corrección de empates y Spearman entre supermercados y población de la celda y del entorno. Define bloques de validación de 3 km.
 
 **Pendiente en esta versión**
 
-- Diagnóstico de correlación espacial (Moran, LISA, correlograma).
-- Modelo de conteo con ambas ciudades y validación por bloques espaciales.
+- Modelo de conteo con ambas ciudades y validación por bloques espaciales de 3 km; I de Moran de los residuos.
 - Brecha por zona y dashboard para la demo.
 
 ### [v1.0](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0) — base de la presentación de avance (2026-10-07)
