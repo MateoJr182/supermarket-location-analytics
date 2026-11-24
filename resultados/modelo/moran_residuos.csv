@@ -1,0 +1,5 @@
+ciudad,variable,I,p_sim
+ccp,n_supermercados,0.10111485118550244,0.001
+ccp,residuo de Pearson,0.016826414490487003,0.022
+stgo,n_supermercados,0.06354230369499818,0.001
+stgo,residuo de Pearson,0.011488830995684879,0.013

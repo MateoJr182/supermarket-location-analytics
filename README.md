@@ -2,7 +2,7 @@
 
 Proyecto del curso *Data Analysis and Machine Learning* (Trabajo BI-ML 2026, Ingeniería Industrial, Universidad de Concepción). Usa solo datos abiertos, Censo 2024 y OpenStreetMap, para encontrar zonas del Gran Santiago y del Gran Concepción que hoy tienen menos supermercados de los que su demanda y accesibilidad harían esperar.
 
-> **Estado:** v2.0 en desarrollo. El ETL v2, el filtro de celdas inhabitables, las variables de entorno y el diagnóstico espacial están listos y corridos con los datos reales; el modelo y el dashboard vienen en las próximas iteraciones (ver [Historial de versiones](#historial-de-versiones)). La versión presentada en el avance queda en el tag [`v1.0`](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0).
+> **Estado:** v2.0 en desarrollo. El ETL v2, el filtro de celdas inhabitables, las variables de entorno, el diagnóstico espacial, el modelo y la brecha por zona están listos y corridos con los datos reales; el dashboard para la demo viene en la próxima iteración (ver [Historial de versiones](#historial-de-versiones)). La versión presentada en el avance queda en el tag [`v1.0`](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0).
 
 ## Contenido
 
@@ -91,6 +91,18 @@ Abrir un supermercado es una inversión alta y difícil de revertir. Hoy la bús
 | `vias_km_<radio>`, `residencial_<radio>` | Kilómetros de vías y fracción residencial promedio en el radio |
 | `n_super_500m`, `n_super_1000m`, `dist_super_m` | Supermercados en el radio y distancia al más cercano. **Solo para la capa de decisión, no son predictores** |
 
+**Predicciones:** `data/processed/predicciones_250m.parquet`, una fila por celda habitable de 250 m, es la entrada del dashboard ([5.7](#57-modelo) a [5.9](#59-brecha-y-zonas-candidatas)).
+
+| Columna | Descripción |
+| --- | --- |
+| `comuna`, `lat`, `lon` | Comuna y centro de la celda en coordenadas geográficas |
+| `esperado` | Supermercados esperados en la celda (gradient boosting, fuera de muestra, calibrado por ciudad) |
+| `esperado_sin_calibrar`, `esperado_glm` | Predicción antes de calibrar y predicción del GLM de Poisson, como referencia |
+| `puntaje_idoneidad` | Percentil (0–100) de `esperado` dentro de su ciudad |
+| `esperado_1000m`, `n_super_1000m`, `brecha_1000m` | Esperados, observados y brecha (esperados − observados) en 1 km |
+| `en_prueba_final` | `True` si la celda está en un bloque de la prueba final (20%) |
+| `candidata` | `True` si la celda es una de las zonas candidatas |
+
 ## 3. Arquitectura y pipeline
 
 ```mermaid
@@ -98,7 +110,7 @@ flowchart TD
     A["Fuentes abiertas<br/>Censo 2024 + OSM (Geofabrik)"] --> B["ETL parametrizado<br/>config.yaml · src/etl.py"]
     B --> C["Filtro de habitabilidad<br/>celdas a ≤ 750 m de una celda poblada"]
     C --> D["Variables de la celda y del entorno<br/>radios de 500 m y 1 km"]
-    D --> E["Modelo de conteo<br/>Poisson y gradient boosting · validación por bloques espaciales"]
+    D --> E["Modelo de conteo<br/>gradient boosting Poisson · validación por bloques de 3 km"]
     E --> F["Brecha por zona<br/>esperados − observados en 1 km"]
     F --> G["Reglas de decisión"]
     G --> H["Dashboard (demo)<br/>mapa, filtros y ranking de zonas"]
@@ -110,7 +122,7 @@ flowchart TD
 | ETL (grilla, conteos, censo, vías) | Listo (v2) | `src/etl.py`, `01_etl_v2.ipynb` |
 | Filtro de habitabilidad y variables de entorno | Listo (v2) | `src/features.py`, `03_filtro_y_entorno.ipynb` |
 | Diagnóstico espacial (Moran, correlograma, LISA) | Listo (v2) | `02_diagnostico_espacial.ipynb` |
-| Modelo y brecha | Pendiente | |
+| Modelo y brecha | Listo (v2) | `src/modelo.py`, `04_modelo.ipynb` |
 | Dashboard | Pendiente | |
 
 ## 4. Decisiones metodológicas
@@ -135,9 +147,17 @@ Cada decisión responde a un punto del feedback de la presentación de avance o 
 | Variables del entorno en radios de 500 m y 1 km | La demanda de un supermercado está en el área que lo rodea; es la forma de incluir la correlación espacial en las variables (feedback) | v2.0 |
 | Supermercados vecinos fuera de los predictores | Son la variable objetivo desplazada en el espacio: el modelo recomendaría abrir al lado de los existentes. Se usan solo en la capa de decisión | v2.0 |
 | Medir la correlación espacial (Moran, correlograma, LISA) | La correlación espacial debe medirse antes de modelar (feedback) | v2.0 |
-| Validar con bloques espaciales de 3 km (2 y 5 km como sensibilidad) | En el correlograma, el parecido entre celdas se apaga entre 2 y 3 km; con bloques más chicos el modelo se evaluaría con celdas vecinas a las de entrenamiento (ver [5.6](#56-diagnóstico-espacial)) | v2.0, se aplica en el modelo |
+| Validar con bloques espaciales de 3 km (2 y 5 km como sensibilidad) | En el correlograma, el parecido entre celdas se apaga entre 2 y 3 km; con bloques más chicos el modelo se evaluaría con celdas vecinas a las de entrenamiento (ver [5.6](#56-diagnóstico-espacial)) | v2.0 |
 | P de LISA recalculado contando los empates | Con casi todas las celdas en 0, `esda` marca como significativos empates exactos y el 66% de las celdas de Santiago salía "bajo-bajo" | v2.0 |
-| Un solo modelo con ambas ciudades | Entrenar en una ciudad y aplicar en otra no sirve porque el ajuste es distinto (feedback) | v2.0, pendiente |
+| Un solo modelo con ambas ciudades, con pesos para que cada ciudad pese lo mismo y una variable indicadora de ciudad | Entrenar en una ciudad y aplicar en otra no sirve porque el ajuste es distinto (feedback); sin pesos, Santiago (77% de las celdas) dominaría el ajuste | v2.0 |
+| Prueba final con el 20% de los bloques de 3 km, apartada antes de cualquier decisión y medida una sola vez | Que el desempeño reportado no dependa de decisiones tomadas con esos mismos datos. Se sortea por ciudad y según si el bloque tiene supermercado, para que la prueba tenga ambas ciudades y una proporción de supermercados parecida al total | v2.0 |
+| Todas las decisiones del modelo con el 80% de desarrollo y validación cruzada de 5 particiones por bloques de 3 km | Elegir la configuración, comparar modelos y revisar la validación sin mirar la prueba final | v2.0 |
+| Gradient boosting con pérdida Poisson como modelo final; GLM de Poisson como referencia interpretable | En desarrollo explica más devianza (D² 0,34 contra 0,25) y concentra más supermercados en el 5% de celdas mejor puntuadas (50% contra 45%) | v2.0 |
+| Ajuste ligero del gradient boosting: 4 configuraciones, se usa la de mayor D² en desarrollo | Las configuraciones complejas sobreajustan los polos comerciales y subestiman el total fuera de muestra | v2.0 |
+| Poisson y no Binomial Negativa | La Binomial Negativa mejora poco el ajuste (AIC 3.809 contra 3.826 en desarrollo) y el modelo final es gradient boosting | v2.0 |
+| No se optimiza la precisión; se reporta precisión y recall en el k% de celdas mejor puntuadas | Cambia lo propuesto en el avance. Con la pregunta nueva, las celdas puntuadas alto sin supermercado ("falsos positivos") son las oportunidades: optimizar la precisión dejaría solo lugares que ya tienen supermercado. El modelo se entrena con la devianza de Poisson | v2.0 |
+| Brecha con predicciones fuera de muestra y calibradas por ciudad | Si la celda se predice con un modelo que la vio, el modelo "memoriza" los supermercados y la brecha sale cerca de 0; la calibración evita faltantes artificiales en Concepción, donde el modelo subestima el total | v2.0 |
+| Zonas candidatas con reglas simples en `config.yaml` | Sin supermercado a 500 m, población en 1 km sobre la mediana, brecha positiva y 1,5 km entre zonas: reglas que un equipo de expansión puede discutir y cambiar | v2.0 |
 
 ## 5. Resultados
 
@@ -236,6 +256,106 @@ Todos los I de Moran de la tabla tienen p ≤ 0,05.
 
 ![LISA de supermercados en celdas habitables de 250 m: celdas alto-alto en Gran Santiago y Gran Concepción](resultados/diagnostico_espacial/lisa_supermercados_250m.png)
 
+### 5.7 Modelo
+
+**Cómo se separaron los datos.** Antes de cualquier decisión se apartó como **prueba final** el 20% de los bloques de 3 km, sorteado por ciudad y según si el bloque tiene supermercado. Con el 80% restante (**desarrollo**) se eligió la configuración del gradient boosting y se compararon los modelos con validación cruzada de 5 particiones por bloques. Recién al final, los modelos se entrenaron con todo el desarrollo y se midieron **una sola vez** en la prueba final. Fuente: [`resultados/modelo/`](resultados/modelo/), notebook `04_modelo.ipynb`.
+
+| Conjunto | Bloques de 3 km | Celdas | Supermercados |
+| --- | ---: | ---: | ---: |
+| Desarrollo (80%) | 268 | 19.724 | 550 |
+| Prueba final (20%) | 68 (46 en Santiago, 22 en Concepción) | 5.224 (20,9%) | 129 (19,0%) |
+
+![Bloques de la prueba final en Gran Santiago y Gran Concepción](resultados/modelo/particion_prueba_final.png)
+
+**Desarrollo: validación cruzada por bloques en el 80%** (aquí se eligió el modelo)
+
+| Modelo | D², Santiago | D², Concepción | D², ambas | PR-AUC | Supermercados en el 5% mejor puntuado |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Nulo (promedio por ciudad) | 0,00 | 0,00 | 0,00 | 0,02 | 4% |
+| Poisson (GLM) | 0,27 | 0,18 | 0,25 | 0,20 | 45% |
+| **Gradient boosting (Poisson)** | **0,32** | **0,41** | **0,34** | **0,23** | **50%** |
+
+**Prueba final: 20% apartado, medido una sola vez** (entre corchetes, intervalo del 95% por remuestreo de bloques)
+
+| Modelo | D², Santiago | D², Concepción | D², ambas | PR-AUC | Supermercados en el 5% mejor puntuado |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Nulo (promedio por ciudad) | 0,00 | −0,01 | 0,00 | 0,02 | 5% |
+| Poisson (GLM) | 0,33 | 0,45 | 0,36 | 0,31 | 51% |
+| **Gradient boosting (Poisson)** | **0,35** [0,26–0,44] | **0,54** [0,40–0,67] | **0,40** [0,32–0,48] | **0,30** [0,22–0,38] | **57%** [45–71] |
+
+![Prueba final: D² de Poisson y porcentaje de supermercados en el 5% de celdas mejor puntuadas, por ciudad y modelo](resultados/modelo/comparacion_modelos.png)
+
+- **El gradient boosting es el modelo final**, elegido en desarrollo (D² 0,34 contra 0,25 del GLM). En la prueba final, en zonas que nunca vio, explica el 40% de la devianza y pone el 57% de los supermercados en el 5% de las celdas con mayor predicción.
+- **La prueba final salió algo mejor que la validación cruzada** (0,40 contra 0,34), pero dentro de su intervalo: con 68 bloques la estimación varía, sobre todo en Concepción (22 bloques). La lectura prudente es que el modelo explica entre un tercio y dos quintos de la devianza en zonas nuevas.
+- **La validación aleatoria infla poco al gradient boosting** (0,35 contra 0,34 con bloques de 3 km). El GLM varía más según el esquema (de 0,25 a 0,30) porque extrapola mal en algunos bloques. Es coherente con el diagnóstico espacial: la dependencia entre celdas con supermercado es débil.
+- **El modelo absorbe casi toda la correlación espacial.** En las predicciones del mapa final, el I de Moran baja de 0,064 en los supermercados a 0,011 en los residuos en Santiago, y de 0,101 a 0,017 en Concepción. Queda un resto significativo pero muy chico (p = 0,013 y 0,022).
+- **Lo que más usa el modelo es el comercio y las vías cercanas:** tener una farmacia en la celda y los kilómetros de vías en 500 m explican la mayor parte de la caída del D² al desordenar las variables. La población pesa menos por separado porque su información se reparte entre variables correlacionadas (celda, 500 m y 1 km).
+- **Calibración del mapa final:** antes de calibrar, el modelo predice 532 supermercados en Santiago (observados: 520) y 141 en Concepción (observados: 159). Para la brecha se ajustan por un factor de 0,98 y 1,13.
+
+![Importancia por permutación de las variables del gradient boosting en desarrollo](resultados/modelo/importancia_variables.png)
+
+#### Precisión y recall en la prueba final
+
+Si se marca como "con supermercado" el k% de celdas con mayor predicción, la **precisión** es el porcentaje de celdas marcadas que tiene supermercado y el **recall**, el porcentaje de celdas con supermercado que quedó marcado. Al azar, la precisión sería 2,3% (la proporción de celdas con supermercado en la prueba final). Fuente: [`resultados/modelo/precision_recall_top.csv`](resultados/modelo/precision_recall_top.csv).
+
+| Celdas marcadas | Celdas | Precisión | Recall |
+| --- | ---: | ---: | ---: |
+| Top 1% | 52 | 42% | 18% |
+| Top 2% | 104 | 37,5% | 33% |
+| Top 5% | 261 | 25% | 55% |
+| Top 10% | 522 | 16% | 71% |
+
+![Precisión y recall en la prueba final según el porcentaje de celdas marcadas](resultados/modelo/precision_recall_top.png)
+
+- En el 1% mejor puntuado, la precisión es **19 veces la del azar** (57% en Concepción y 37% en Santiago).
+- **La precisión no se optimiza, y es un cambio respecto de la presentación de avance.** Entonces el modelo era un clasificador de presencia y se propuso priorizar la precisión. Con la pregunta nueva, las celdas que el modelo puntúa alto y no tienen supermercado (los "falsos positivos") son justamente las oportunidades de las que sale la brecha: un modelo con precisión perfecta solo marcaría lugares que ya tienen supermercado. Por eso el modelo se entrena con la devianza de Poisson y la precisión se usa para validar que el puntaje reconoce lugares "tipo supermercado".
+- La precisión que le importa a un equipo de expansión es la de la **lista de zonas candidatas**, y no se puede medir con estos datos. Una aproximación barata es revisar las zonas en Google Maps y contar cuántas ya tienen un supermercado que OSM no registra.
+
+### 5.8 Sensibilidad del modelo al tamaño de celda
+
+El mismo modelo en todas las grillas, con los mismos bloques de prueba final apartados; las métricas son de validación cruzada en desarrollo. Para comparar zonas, la brecha se suma en cuadrados de 1 km comunes a todas. Fuente: [`resultados/modelo/sensibilidad_tamano.csv`](resultados/modelo/sensibilidad_tamano.csv).
+
+| Celda | D² en desarrollo (ambas) | Supermercados en el 5% mejor puntuado | Zonas de 1 km del top 50 que coinciden con 250 m (Santiago / Concepción) | Correlación de rangos de la brecha con 250 m (Santiago / Concepción) |
+| --- | ---: | ---: | ---: | ---: |
+| 125 m | 0,29 | 51% | 76% / 78% | 0,96 / 0,90 |
+| **250 m** | **0,34** | **50%** | — | — |
+| 250 m desplazada 125 m | 0,34 | 50% | 52% / 64% | 0,73 / 0,68 |
+| 500 m | 0,43 | 38% | 66% / 78% | 0,94 / 0,90 |
+| 1000 m | 0,44 | 18% | 62% / 78% | 0,89 / 0,84 |
+
+- **El D² sube con el tamaño de celda, pero la herramienta pierde precisión.** Con celdas grandes es más fácil acertar el conteo, pero el 5% de celdas mejor puntuadas cubre más territorio y captura menos supermercados: 18% a 1000 m contra 50% a 250 m.
+- **125 y 250 m concentran lo mismo** (51% y 50%, sobre la misma superficie), pero 250 m explica más (D² 0,34 contra 0,29) y no tiene el problema de las celdas de 125 m, donde la mitad de las que tienen supermercado no tiene habitantes ([5.1](#51-sensibilidad-al-tamaño-de-celda-etl-v2)). **250 m se mantiene como tamaño principal.**
+- **El orden de las zonas es estable entre tamaños** (correlación de rangos de 0,84 a 0,96), aunque solo coinciden exactamente entre el 52% y el 78% de las 50 zonas con mayor brecha. La grilla desplazada coincide menos porque sus celdas cruzan los bordes de los cuadrados de 1 km usados para comparar. Por eso las zonas candidatas se leen como sectores a revisar, no como celdas exactas.
+
+### 5.9 Brecha y zonas candidatas
+
+La **brecha** de cada celda es la suma de supermercados esperados en 1 km a la redonda menos los observados en ese radio. Para el mapa, cada celda se predice con un modelo que no vio su bloque (5 particiones por bloques sobre todas las celdas, con la configuración ya elegida en desarrollo). Las **zonas candidatas** cumplen las reglas de `config.yaml`: sin supermercados a 500 m o menos, población en 1 km sobre la mediana de su ciudad y brecha positiva; se elige la celda de mayor brecha, se descartan las que están a menos de 1,5 km y se repite hasta 15 zonas por ciudad. Lista completa: [`resultados/modelo/zonas_candidatas.csv`](resultados/modelo/zonas_candidatas.csv).
+
+![Mapa de la brecha en 1 km con las 15 zonas candidatas de cada ciudad](resultados/modelo/mapa_brecha_250m.png)
+
+**Gran Santiago, 5 primeras zonas**
+
+| # | Comuna | Brecha en 1 km | Esperados | Observados | Habitantes en 1 km | Mapa |
+| ---: | --- | ---: | ---: | ---: | ---: | --- |
+| 1 | Las Condes | 6,0 | 7,0 | 1 | 33.903 | [ver](https://www.google.com/maps?q=-33.416727,-70.595791) |
+| 2 | Ñuñoa | 4,6 | 5,6 | 1 | 51.573 | [ver](https://www.google.com/maps?q=-33.455115,-70.591114) |
+| 3 | Pudahuel | 4,6 | 4,6 | 0 | 41.045 | [ver](https://www.google.com/maps?q=-33.432806,-70.741289) |
+| 4 | Las Condes | 4,3 | 7,3 | 3 | 46.325 | [ver](https://www.google.com/maps?q=-33.412425,-70.579582) |
+| 5 | Las Condes | 3,6 | 4,6 | 1 | 25.749 | [ver](https://www.google.com/maps?q=-33.394698,-70.55507) |
+
+**Gran Concepción, 5 primeras zonas**
+
+| # | Comuna | Brecha en 1 km | Esperados | Observados | Habitantes en 1 km | Mapa |
+| ---: | --- | ---: | ---: | ---: | ---: | --- |
+| 1 | Concepción | 7,8 | 12,8 | 5 | 17.104 | [ver](https://www.google.com/maps?q=-36.830648,-73.041836) |
+| 2 | Concepción | 5,5 | 9,5 | 4 | 21.346 | [ver](https://www.google.com/maps?q=-36.822005,-73.064479) |
+| 3 | Talcahuano | 4,3 | 5,3 | 1 | 12.862 | [ver](https://www.google.com/maps?q=-36.714741,-73.120352) |
+| 4 | Coronel | 3,4 | 4,4 | 1 | 5.742 | [ver](https://www.google.com/maps?q=-37.037327,-73.143346) |
+| 5 | Talcahuano | 2,8 | 2,8 | 0 | 18.269 | [ver](https://www.google.com/maps?q=-36.777274,-73.085212) |
+
+- Las zonas con mayor brecha combinan muchas vías y comercio con pocos supermercados en OSM. Tres de las cinco primeras de Santiago están en Las Condes, una comuna con mucho comercio: conviene revisarlas en Google Maps antes de leerlas como oportunidad, porque OSM puede tener supermercados sin mapear o etiquetados con otra categoría.
+- En Concepción las dos primeras zonas están en el centro, donde el modelo espera más supermercados de los que hay en 1 km (12,8 y 9,5 esperados contra 5 y 4 observados).
+
 ## 6. Riesgos de datos y limitaciones
 
 - **Cobertura desigual de OSM:** las comunas de mayores ingresos suelen estar mejor mapeadas, lo que sesga los conteos.
@@ -244,7 +364,14 @@ Todos los I de Moran de la tabla tienen p ≤ 0,05.
 - **Sesgo heredado:** el modelo aprende de las decisiones pasadas de las cadenas, incluido el sesgo socioeconómico, y no hay variable de ingreso.
 - **Unidad espacial:** el resultado depende del tamaño y la posición de la celda; el análisis de sensibilidad lo acota.
 - **Población fuera de manzanas:** el archivo de manzanas suma 16,2 millones de personas de los 18,5 millones censados; la diferencia es principalmente población rural o fuera de manzanas urbanas. Por eso algunos supermercados periféricos aparecen lejos de toda celda poblada (ver [5.4](#54-filtro-de-celdas-inhabitables)).
+- **Lo que el modelo no ve:** precios de suelo, terrenos disponibles, normativa, ingresos de los hogares ni ventas. La brecha indica dónde mirar, no dónde invertir.
+- **Prueba final chica:** son 68 bloques (22 en Concepción), así que las métricas por ciudad tienen intervalos amplios (ver [5.7](#57-modelo) y [Próximos pasos](#próximos-pasos)).
 - **Privacidad:** se usan solo conteos agregados por manzana publicados por el INE; no hay datos personales.
+
+### Próximos pasos
+
+- **Una tercera ciudad.** El ETL y las variables de entorno leen las ciudades desde `config.yaml` y usan datos de todo el país (`chile.gpkg` y la cartografía del Censo), así que agregar una ciudad solo requiere sus comunas y su CRS UTM. En el modelo habría que cambiar el indicador `es_ccp` por uno por ciudad. Gran Valparaíso (Valparaíso, Viña del Mar, Concón, Quilpué y Villa Alemana) ampliaría la prueba final y permitiría evaluar el modelo en una ciudad con otra geografía; por sus cerros, probablemente convendría sumar una variable de pendiente, que el modelo hoy no tiene.
+- **Por qué no se hizo en la v2.0:** con un tamaño parecido al de Gran Concepción, la prueba final crecería en unos 20 bloques y su intervalo se achicaría poco, sin agrandar la prueba de cada ciudad por separado. A cambio, habría cambiado todos los resultados cerca del cierre de la versión.
 
 ## 7. Cómo reproducir
 
@@ -272,6 +399,13 @@ Todos los I de Moran de la tabla tienen p ≤ 0,05.
    Lee las tablas de `data/processed/celdas_*.parquet`, genera `data/processed/modelo_*.parquet` y `resultados/features/`, y toma menos de un minuto. No necesita los datos crudos.
 
 5. Correr el diagnóstico espacial con el notebook `02_diagnostico_espacial.ipynb`. Lee `data/processed/`, genera `resultados/diagnostico_espacial/` y toma unos 3 minutos.
+6. Entrenar y validar el modelo y calcular la brecha, con el notebook `04_modelo.ipynb` o por consola:
+
+   ```bash
+   python -m src.modelo
+   ```
+
+   Lee `data/processed/modelo_*.parquet`, genera `data/processed/predicciones_250m.parquet` y `resultados/modelo/`, y toma unos 3 minutos. Usa el archivo comunal de `data/raw/` solo para poner el nombre de la comuna; si no está, esa columna queda vacía.
 
 Las tablas de `data/processed/` sí se versionan, así que los notebooks de análisis se pueden correr sin descargar los datos crudos. La versión de la presentación de avance se puede revisar en el tag [`v1.0`](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0) o con `git checkout v1.0`.
 
@@ -282,21 +416,24 @@ Las tablas de `data/processed/` sí se versionan, así que los notebooks de aná
 ├── config.yaml                        # parámetros: rutas, comunas, tamaños de celda
 ├── src/
 │   ├── etl.py                         # funciones del ETL v2
-│   └── features.py                    # filtro de celdas inhabitables y variables de entorno
+│   ├── features.py                    # filtro de celdas inhabitables y variables de entorno
+│   └── modelo.py                      # modelos, validación por bloques, brecha y zonas candidatas
 ├── 01_etl_v2.ipynb                    # corre el ETL v2 y muestra los controles
 ├── 02_diagnostico_espacial.ipynb      # Moran global, correlograma, LISA y población de la celda vs. entorno
 ├── 03_filtro_y_entorno.ipynb          # elige X, aplica el filtro y revisa las variables de entorno
+├── 04_modelo.ipynb                    # compara modelos, valida por bloques, sensibilidad y brecha
 ├── archivo/                           # v1 de la presentación de avance (tag v1.0)
 │   ├── 01_etl_v1.ipynb
 │   └── dataset_entrenamiento_<ciudad>.csv
 ├── data/
 │   ├── raw/                           # datos crudos (no se versionan)
 │   ├── interim/                       # capas intermedias por ciudad (no se versionan)
-│   └── processed/                     # tablas por celda y tablas para el modelo (se versionan)
+│   └── processed/                     # tablas por celda, para el modelo y predicciones (se versionan)
 ├── resultados/
 │   ├── etl_v2/                        # resumen de tamaños y mapa de control
 │   ├── features/                      # curva y mapa del filtro X, correlaciones de entorno
-│   └── diagnostico_espacial/          # Moran, correlograma, LISA, Spearman y bloques de validación
+│   ├── diagnostico_espacial/          # Moran, correlograma, LISA, Spearman y bloques de validación
+│   └── modelo/                        # partición, métricas de desarrollo y prueba final, precisión/recall, sensibilidad y zonas candidatas
 ├── requirements.txt
 └── README.md
 ```
@@ -307,7 +444,7 @@ Las tablas de `data/processed/` sí se versionan, así que los notebooks de aná
 
 ### v2.0 — en desarrollo (desde 2026-10-18)
 
-Responde al feedback de la presentación de avance. Ramas `ETL-V2`, `variables-entorno` y `diagnostico-espacial`.
+Responde al feedback de la presentación de avance. Ramas `ETL-V2`, `variables-entorno`, `diagnostico-espacial` y `modelo`.
 
 **Listo**
 
@@ -328,11 +465,13 @@ Responde al feedback de la presentación de avance. Ramas `ETL-V2`, `variables-e
 - Variables de entorno en radios de 500 m y 1 km y variables de competencia separadas para la capa de decisión.
 - Tablas para el modelo con ambas ciudades: `data/processed/modelo_<tamaño>m.parquet` (24.948 celdas habitables a 250 m).
 - Diagnóstico espacial (`02_diagnostico_espacial.ipynb`): I de Moran global, correlograma acumulado y por anillos hasta 5 km, LISA con corrección de empates y Spearman entre supermercados y población de la celda y del entorno. Define bloques de validación de 3 km.
+- Modelo (`src/modelo.py`, `04_modelo.ipynb`): un solo modelo con ambas ciudades. Prueba final con el 20% de los bloques de 3 km apartado antes de cualquier decisión; elección de la configuración y comparación de modelos solo con el 80% de desarrollo (validación cruzada por bloques). Gradient boosting Poisson contra GLM de Poisson y un modelo nulo: D² 0,34 en desarrollo y 0,40 en la prueba final, con intervalos bootstrap y precisión/recall en el k% mejor puntuado. También: validación aleatoria contra bloques de 1, 2, 3 y 5 km, I de Moran de los residuos, importancia de variables, coeficientes del GLM y prueba de sobredispersión.
+- Sensibilidad del modelo al tamaño de celda (125, 250, 500 y 1000 m y grilla desplazada), con métricas de desarrollo: 250 m se mantiene como tamaño principal.
+- Brecha por zona (esperados − observados en 1 km) con predicciones fuera de muestra y calibradas por ciudad, y 15 zonas candidatas por ciudad con comuna y enlace a Google Maps (`data/processed/predicciones_250m.parquet`, `resultados/modelo/zonas_candidatas.csv`).
 
 **Pendiente en esta versión**
 
-- Modelo de conteo con ambas ciudades y validación por bloques espaciales de 3 km; I de Moran de los residuos.
-- Brecha por zona y dashboard para la demo.
+- Dashboard para la demo, a partir de `data/processed/predicciones_250m.parquet`.
 
 ### [v1.0](https://github.com/MateoJr182/supermarket-location-analytics/tree/v1.0) — base de la presentación de avance (2026-10-07)
 
@@ -357,6 +496,7 @@ Responde al feedback de la presentación de avance. Ramas `ETL-V2`, `variables-e
 
 ## Referencias
 
+- Roberts, D. R., Bahn, V., Ciuti, S., et al. (2017). [Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure](https://doi.org/10.1111/ecog.02881). *Ecography*, 40(8), 913–929.
 - Chen, X., Ye, X., Widener, M. J., et al. (2022). [A systematic review of the modifiable areal unit problem (MAUP) in community food environmental research](https://link.springer.com/article/10.1007/s44212-022-00021-1). *Urban Informatics*.
 - Instituto Nacional de Estadísticas (2024). [Censo de Población y Vivienda 2024: resultados y cartografía](https://censo2024.ine.gob.cl/resultados/).
 - Instituto Nacional de Estadísticas (2025). [Primeros resultados del Censo 2024: 18.480.432 personas fueron censadas en Chile](https://www.ine.gob.cl/sala-de-prensa/prensa/general/noticia/2025/03/27/primeros-resultados-del-censo-2024-18.480.432-personas-fueron-censadas-en-chile-manteni%C3%A9ndose-la-tendencia-de-envejecimiento-de-la-poblaci%C3%B3n).

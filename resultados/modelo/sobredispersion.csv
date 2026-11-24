@@ -1,0 +1,6 @@
+medida,valor
+alpha_binomial_negativa,0.637372834476067
+p_valor_alpha,0.000586172773979195
+aic_poisson,3825.7844382893386
+aic_binomial_negativa,3809.1030138178317
+devianza_sobre_gl_poisson,0.13818170202469326

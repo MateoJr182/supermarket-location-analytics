@@ -1,4 +1,4 @@
-# Configuración del proyecto (ETL v2 y variables de entorno). Todo lo que cambia entre corridas vive aquí, no en el código.
+# Configuración del proyecto (ETL v2, variables de entorno y modelo). Todo lo que cambia entre corridas vive aquí, no en el código.
 
 version: "2.0"
 
@@ -10,6 +10,7 @@ rutas:
   processed: data/processed      # tablas por celda en Parquet (sí se versionan)
   resultados: resultados/etl_v2  # resumen y figuras de control
   resultados_features: resultados/features  # filtro X y variables de entorno
+  resultados_modelo: resultados/modelo        # métricas, diagnóstico, sensibilidad y zonas candidatas
 
 # Fecha del extracto de OpenStreetMap (descarga de chile.gpkg desde Geofabrik).
 osm_fecha_descarga: "2026-10-02"
@@ -37,6 +38,32 @@ features:
     candidatos_m: [0, 250, 500, 750, 1000, 1500, 2000]
     cobertura_supermercados: 0.99    # X = menor candidato que conserva al menos el 99% de los supermercados
     x_fijo_m: null                   # si se define un número, se usa en vez del X elegido por datos
+
+modelo:
+  tamano_m: 250                      # grilla principal
+  bloque_validacion_m: 3000          # lado de los bloques de la validación cruzada (diagnóstico espacial, 5.6)
+  bloques_sensibilidad_m: [1000, 2000, 3000, 5000]
+  n_folds: 5
+  fraccion_prueba_final: 0.2         # bloques apartados antes de todo para medir el modelo una sola vez
+  repeticiones_bootstrap: 1000       # intervalos del 95% de la prueba final (remuestreo de bloques)
+  pcts_precision: [1, 2, 5, 10]      # precisión y recall si se marca el k% de celdas mejor puntuadas
+  semilla: 42
+  pesos_por_ciudad: true             # cada ciudad pesa lo mismo en el ajuste
+  poisson_alpha: 0.001               # regularización L2 del GLM de Poisson
+  gradient_boosting_grilla:         # ajuste ligero: se usa la configuración con mayor D² en bloques de 3 km
+    - {learning_rate: 0.05, max_iter: 300, max_leaf_nodes: 15, min_samples_leaf: 40, l2_regularization: 1.0}
+    - {learning_rate: 0.05, max_iter: 150, max_leaf_nodes: 7, min_samples_leaf: 100, l2_regularization: 1.0}
+    - {learning_rate: 0.05, max_iter: 200, max_leaf_nodes: 5, min_samples_leaf: 150, l2_regularization: 1.0}
+    - {learning_rate: 0.03, max_iter: 300, max_leaf_nodes: 7, min_samples_leaf: 100, l2_regularization: 1.0}
+  top_pct_captura: 5                 # métrica: % de supermercados en el 5% de celdas con mayor predicción
+  n_zonas_estabilidad: 50            # zonas de 1 km comparadas entre tamaños de celda
+
+decision:
+  radio_brecha_m: 1000               # brecha = esperados − observados en este radio
+  sin_supermercado_a_m: 500          # la candidata no tiene supermercados a esta distancia o menos
+  percentil_min_poblacion_1km: 50    # población en 1 km sobre la mediana de las celdas habitables de su ciudad
+  separacion_min_m: 1500             # distancia mínima entre dos zonas candidatas
+  n_candidatas_por_ciudad: 15
 
 ciudades:
   stgo:
